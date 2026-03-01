@@ -1,0 +1,204 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>TermiNateVader | Open World Universe</title>
+    <style>
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', Courier, monospace; color: #00f2ff; }
+        #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
+        
+        /* HUD Elements */
+        .hud { position: absolute; z-index: 10; pointer-events: none; text-transform: uppercase; }
+        #crosshair { top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: rgba(0, 242, 255, 0.5); }
+        
+        #mission-log { top: 20px; right: 20px; width: 200px; background: rgba(0, 20, 40, 0.7); border: 1px solid #00f2ff; padding: 10px; pointer-events: auto; max-height: 40vh; overflow-y: auto; }
+        .log-entry { font-size: 10px; margin-bottom: 5px; cursor: pointer; border-bottom: 1px solid rgba(0, 242, 255, 0.2); padding: 2px; }
+        .log-entry:hover { background: #00f2ff; color: #000; }
+
+        #ship-stats { bottom: 20px; left: 20px; background: rgba(0, 20, 40, 0.7); border: 1px solid #00f2ff; padding: 10px; }
+        .stat { font-size: 12px; margin: 3px 0; }
+
+        /* Mobile/Console Joystick */
+        #joystick-zone { position: absolute; bottom: 40px; right: 40px; width: 120px; height: 120px; background: rgba(255,255,255,0.1); border-radius: 50%; pointer-events: auto; display: none; }
+        @media (max-width: 1024px) { #joystick-zone { display: block; } }
+
+        .planet-label { background: rgba(0,0,0,0.8); border: 1px solid #00f2ff; color: #00f2ff; padding: 5px 10px; font-size: 12px; white-space: nowrap; pointer-events: auto; text-decoration: none; }
+        .planet-label:hover { background: #00f2ff; color: #000; }
+    </style>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
+</head>
+<body>
+
+    <div id="canvas-container"></div>
+    <div id="crosshair" class="hud">+</div>
+
+    <div id="mission-log" class="hud">
+        <div style="font-weight: bold; border-bottom: 2px solid #00f2ff; margin-bottom: 5px;">Sector Navigation</div>
+        <div id="log-list"></div>
+    </div>
+
+    <div id="ship-stats" class="hud">
+        <div class="stat">Pilot: TermiNateVader</div>
+        <div class="stat">Engine: ON</div>
+        <div class="stat" id="coords">POS: 0, 0, 0</div>
+    </div>
+
+    <div id="joystick-zone"></div>
+
+    <script>
+        const links = [
+            { name: "YouTube", url: "https://www.youtube.com/terminatevader" },
+            { name: "Discord", url: "https://discord.gg/DVNUcqe" },
+            { name: "GitHub", url: "https://github.com/terminatevader" },
+            { name: "Store", url: "https://store.terminatevader.com/" },
+            { name: "Twitter/X", url: "https://x.com/terminatevader" },
+            { name: "Instagram", url: "https://www.instagram.com/terminatevader" },
+            { name: "Minecraft", url: "https://realms.gg/Hh4_zrgshEkxurU" },
+            { name: "Roblox", url: "https://www.roblox.com/users/2212929342/profile" }
+        ];
+
+        // --- SCENE SETUP ---
+        const scene = new THREE.Scene();
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
+        const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        document.getElementById('canvas-container').appendChild(renderer.domElement);
+
+        const labelRenderer = new THREE.CSS2DRenderer();
+        labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        labelRenderer.domElement.style.position = 'absolute';
+        labelRenderer.domElement.style.top = '0';
+        labelRenderer.domElement.style.pointerEvents = 'none';
+        document.body.appendChild(labelRenderer.domElement);
+
+        // --- LIGHTING ---
+        const ambient = new THREE.AmbientLight(0x404040, 2);
+        scene.add(ambient);
+
+        // --- INFINITE WORLD GENERATION ---
+        // Stars
+        const starGeo = new THREE.BufferGeometry();
+        const starCount = 10000;
+        const starPositions = new Float32Array(starCount * 3);
+        for(let i=0; i<starCount*3; i++) starPositions[i] = (Math.random() - 0.5) * 4000;
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPositions, 3));
+        const starMat = new THREE.PointsMaterial({ color: 0xffffff, size: 1.5 });
+        scene.add(new THREE.Points(starGeo, starMat));
+
+        // Create Link Waypoints
+        const waypoints = [];
+        const logList = document.getElementById('log-list');
+
+        links.forEach((link, i) => {
+            const container = new THREE.Group();
+            // Randomly scatter in the open world
+            container.position.set(
+                (Math.random() - 0.5) * 1000,
+                (Math.random() - 0.5) * 500,
+                (Math.random() - 0.5) * 1000
+            );
+
+            // Planet Mesh
+            const geo = new THREE.SphereGeometry(5, 32, 32);
+            const mat = new THREE.MeshStandardMaterial({ 
+                color: new THREE.Color().setHSL(Math.random(), 0.7, 0.5),
+                emissive: 0x001122
+            });
+            const planet = new THREE.Mesh(geo, mat);
+            container.add(planet);
+
+            // Label
+            const a = document.createElement('a');
+            a.className = 'planet-label';
+            a.textContent = `[TARGET: ${link.name}]`;
+            a.href = link.url;
+            a.target = "_blank";
+            a.style.pointerEvents = "auto";
+            const label = new THREE.CSS2DObject(a);
+            label.position.set(0, 8, 0);
+            container.add(label);
+
+            scene.add(container);
+            waypoints.push(container);
+
+            // HUD Entry
+            const entry = document.createElement('div');
+            entry.className = 'log-entry';
+            entry.textContent = `> WARP TO ${link.name}`;
+            entry.onclick = () => warpTo(container.position);
+            logList.appendChild(entry);
+        });
+
+        // --- FLIGHT CONTROLS ---
+        let moveSpeed = 0;
+        const keys = {};
+        window.onkeydown = (e) => keys[e.key.toLowerCase()] = true;
+        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
+
+        let mouseX = 0, mouseY = 0;
+        window.onmousemove = (e) => {
+            if (document.pointerLockElement === document.body) {
+                camera.rotation.y -= e.movementX * 0.002;
+                camera.rotation.x -= e.movementY * 0.002;
+            }
+        };
+
+        // Click to start / Lock pointer
+        document.addEventListener('mousedown', () => {
+            if(document.pointerLockElement !== document.body) document.body.requestPointerLock();
+        });
+
+        function warpTo(targetPos) {
+            const startPos = camera.position.clone();
+            const duration = 1000; 
+            const startTime = performance.now();
+
+            function updateWarp() {
+                const now = performance.now();
+                const t = Math.min((now - startTime) / duration, 1);
+                // Ease in-out
+                const ease = t < .5 ? 2 * t * t : -1 + (4 - 2 * t) * t;
+                
+                camera.position.lerpVectors(startPos, new THREE.Vector3(targetPos.x, targetPos.y, targetPos.z + 30), ease);
+                camera.lookAt(targetPos);
+                
+                if (t < 1) requestAnimationFrame(updateWarp);
+            }
+            updateWarp();
+        }
+
+        // --- GAME LOOP ---
+        const clock = new THREE.Clock();
+        function animate() {
+            requestAnimationFrame(animate);
+            const delta = clock.getDelta();
+
+            // Movement Logic
+            const speed = 100;
+            if (keys['w']) camera.translateZ(-speed * delta);
+            if (keys['s']) camera.translateZ(speed * delta);
+            if (keys['a']) camera.translateX(-speed * delta);
+            if (keys['d']) camera.translateX(speed * delta);
+            if (keys[' ']) camera.translateY(speed * delta);
+            if (keys['shift']) camera.translateY(-speed * delta);
+
+            // Update HUD
+            document.getElementById('coords').textContent = `POS: ${Math.round(camera.position.x)}, ${Math.round(camera.position.y)}, ${Math.round(camera.position.z)}`;
+
+            renderer.render(scene, camera);
+            labelRenderer.render(scene, camera);
+        }
+
+        animate();
+
+        window.onresize = () => {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            labelRenderer.setSize(window.innerWidth, window.innerHeight);
+        };
+    </script>
+</body>
+</html>
