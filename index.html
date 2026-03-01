@@ -1,0 +1,903 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width,initial-scale=1,maximum-scale=1,user-scalable=no"/>
+<meta name="theme-color" content="#000000"/>
+<title>TermiNateVader</title>
+<link rel="preconnect" href="https://fonts.googleapis.com"/>
+<link href="https://fonts.googleapis.com/css2?family=Share+Tech+Mono&family=Orbitron:wght@700;900&display=swap" rel="stylesheet"/>
+<style>
+:root {
+  --red:#ff2200; --red2:#ff4422; --dim:#1a0008;
+  --bg:#000005; --txt:#cc3322; --muted:#441122;
+}
+*{margin:0;padding:0;box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Share Tech Mono',monospace;touch-action:none;}
+canvas{display:block;position:fixed;inset:0;}
+
+/* ═══ SCANLINES ═══════════════════════════════════════════ */
+#scanlines{
+  position:fixed;inset:0;pointer-events:none;z-index:10;
+  background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.05) 2px,rgba(0,0,0,.05) 4px);
+}
+
+/* ═══ OVERLAY ════════════════════════════════════════════ */
+#overlay{
+  position:fixed;inset:0;z-index:100;
+  display:flex;flex-direction:column;align-items:center;justify-content:center;gap:20px;
+  background:radial-gradient(ellipse at 50% 35%,#1a000c 0%,#000 65%);
+  padding:20px;
+}
+.logo-eyebrow{
+  font-size:clamp(.6rem,.9vw,.75rem);letter-spacing:.45em;
+  color:var(--muted);text-transform:uppercase;text-align:center;
+}
+.logo{
+  font-family:'Orbitron',sans-serif;font-weight:900;
+  font-size:clamp(1.8rem,5.5vw,4.5rem);text-align:center;line-height:1;
+  background:linear-gradient(135deg,#ff5533 0%,#ff0000 45%,#cc0000 100%);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  filter:drop-shadow(0 0 35px #ff220066);
+}
+.logo em{-webkit-text-fill-color:#ffffff;font-style:normal;opacity:.85;}
+.tagline{
+  font-size:clamp(.65rem,.9vw,.8rem);color:var(--muted);
+  text-align:center;max-width:380px;line-height:1.75;
+}
+.ctrl-panel{
+  border:1px solid #2a0010;background:#03000a;
+  padding:14px 26px;font-size:clamp(.6rem,.75vw,.72rem);
+  color:#3a0f1a;text-align:center;line-height:2.1;
+  max-width:420px;width:100%;
+}
+.ctrl-panel b{color:var(--red2);}
+.ctrl-panel .row-icon{color:#551122;font-size:.65rem;}
+#enterBtn{
+  font-family:'Orbitron',sans-serif;font-weight:700;
+  font-size:clamp(.8rem,1.1vw,.95rem);letter-spacing:.2em;text-transform:uppercase;
+  color:var(--red);background:transparent;border:2px solid var(--red);
+  padding:14px 44px;cursor:pointer;
+  box-shadow:0 0 28px #ff222240,inset 0 0 28px #ff22000d;
+  transition:all .25s;
+}
+#enterBtn:hover,#enterBtn:focus{
+  background:#ff222218;
+  box-shadow:0 0 60px #ff2222aa,inset 0 0 30px #ff222230;
+  transform:scale(1.04);outline:none;
+}
+#enterBtn:active{transform:scale(.98);}
+
+/* ═══ HUD ════════════════════════════════════════════════ */
+#hud{
+  position:fixed;top:16px;left:16px;z-index:20;
+  display:none;pointer-events:none;
+  font-size:clamp(.55rem,.75vw,.68rem);color:#ff222244;line-height:2;
+}
+#hud .hname{font-family:'Orbitron',sans-serif;font-size:clamp(.7rem,1vw,.85rem);color:var(--red);margin-bottom:3px;}
+#hud b{color:#ff4444;}
+#hud .hint-sep{color:#330011;}
+
+/* ═══ CROSSHAIR ══════════════════════════════════════════ */
+#xhair{
+  position:fixed;top:50%;left:50%;transform:translate(-50%,-50%);
+  width:20px;height:20px;pointer-events:none;z-index:20;display:none;
+}
+#xhair::before,#xhair::after{content:'';position:absolute;background:rgba(255,255,255,.55);}
+#xhair::before{width:2px;height:100%;left:calc(50% - 1px);}
+#xhair::after{width:100%;height:2px;top:calc(50% - 1px);}
+
+/* ═══ TOOLTIP ════════════════════════════════════════════ */
+#tip{
+  position:fixed;bottom:clamp(50px,8vh,70px);left:50%;transform:translateX(-50%);
+  font-size:clamp(.7rem,.85vw,.82rem);color:#fff;
+  background:rgba(0,0,0,.9);border:1px solid var(--red);
+  padding:10px 22px;z-index:20;white-space:nowrap;
+  opacity:0;transition:opacity .18s;pointer-events:none;
+}
+
+/* ═══ MINIMAP ════════════════════════════════════════════ */
+#minimap{
+  position:fixed;bottom:16px;right:16px;
+  width:clamp(80px,10vw,110px);height:clamp(80px,10vw,110px);
+  border:1px solid #280010;background:rgba(0,0,0,.75);
+  z-index:20;display:none;overflow:hidden;
+}
+#mmCanvas{width:100%;height:100%;}
+
+/* ═══ MOBILE JOYSTICK ════════════════════════════════════ */
+#joyWrap{
+  position:fixed;left:20px;bottom:24px;z-index:30;
+  display:none;pointer-events:none;
+}
+#joyBase{
+  width:110px;height:110px;border-radius:50%;
+  background:rgba(255,34,0,.1);border:2px solid rgba(255,34,0,.3);
+  display:flex;align-items:center;justify-content:center;
+  pointer-events:auto;touch-action:none;
+}
+#joyKnob{
+  width:42px;height:42px;border-radius:50%;
+  background:radial-gradient(circle,#ff3300 0%,#881100 100%);
+  border:2px solid #ff2200;box-shadow:0 0 18px #ff220077;
+  pointer-events:none;transition:transform .05s;
+}
+
+/* ═══ MOBILE LOOK AREA ═══════════════════════════════════ */
+#lookArea{
+  position:fixed;right:0;top:0;
+  width:55%;height:100%;z-index:29;
+  display:none;pointer-events:auto;touch-action:none;
+}
+
+/* ═══ MOBILE TAP-TO-OPEN BTN ════════════════════════════ */
+#tapBtn{
+  position:fixed;bottom:24px;right:20px;z-index:31;
+  display:none;
+  font-family:'Orbitron',sans-serif;font-size:.65rem;letter-spacing:.12em;
+  color:var(--red);background:rgba(0,0,0,.85);border:2px solid var(--red);
+  padding:10px 14px;border-radius:4px;
+  box-shadow:0 0 16px #ff220044;
+  pointer-events:auto;
+}
+
+/* ═══ GAMEPAD HINT ═══════════════════════════════════════ */
+#padHint{
+  position:fixed;top:16px;right:16px;z-index:20;
+  display:none;pointer-events:none;
+  font-size:clamp(.55rem,.7vw,.65rem);color:#ff222233;text-align:right;line-height:1.9;
+}
+#padHint b{color:#ff3322aa;}
+
+/* ═══ FALLBACK 2D PAGE ═══════════════════════════════════ */
+#fallback{
+  display:none;position:fixed;inset:0;z-index:999;
+  overflow-y:auto;background:#000;
+  padding:40px 20px;
+}
+#fallback .f-logo{
+  font-family:'Orbitron',sans-serif;font-weight:900;
+  font-size:clamp(1.6rem,5vw,3rem);text-align:center;
+  background:linear-gradient(135deg,#ff5533,#ff0000,#cc0000);
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;
+  margin-bottom:8px;
+}
+#fallback .f-sub{font-size:.75rem;color:#441122;text-align:center;margin-bottom:30px;letter-spacing:.3em;}
+.f-grid{
+  display:grid;grid-template-columns:repeat(auto-fill,minmax(150px,1fr));
+  gap:10px;max-width:680px;margin:0 auto;
+}
+.f-link{
+  display:block;padding:14px 10px;
+  border:1px solid #220009;background:#050002;
+  text-align:center;text-decoration:none;
+  font-size:.78rem;color:#dd3322;
+  transition:background .2s;
+}
+.f-link:hover,.f-link:focus{background:#140006;outline:none;}
+.f-link .fl-cat{font-size:.6rem;color:#330a11;display:block;margin-top:4px;}
+
+/* ═══ INTRO ANIM ═════════════════════════════════════════ */
+@keyframes fadeUp{from{opacity:0;transform:translateY(16px);}to{opacity:1;transform:none;}}
+#overlay > *{animation:fadeUp .6s ease both;}
+#overlay > *:nth-child(1){animation-delay:.1s;}
+#overlay > *:nth-child(2){animation-delay:.2s;}
+#overlay > *:nth-child(3){animation-delay:.3s;}
+#overlay > *:nth-child(4){animation-delay:.4s;}
+#overlay > *:nth-child(5){animation-delay:.5s;}
+</style>
+</head>
+<body>
+
+<!-- FALLBACK for no-WebGL / very basic devices -->
+<div id="fallback">
+  <div class="f-logo">TermiNateVader</div>
+  <div class="f-sub">// ALL LINKS //</div>
+  <div class="f-grid" id="fGrid"></div>
+</div>
+
+<div id="scanlines"></div>
+
+<!-- ═══ START OVERLAY ══════════════════════════════════════════ -->
+<div id="overlay">
+  <div class="logo-eyebrow">// entering the void //</div>
+  <div class="logo">Termi<em>N</em>ate<em>V</em>ader</div>
+  <div class="tagline">An open 3D void. Explore and walk up to glowing portals to visit every platform.</div>
+  <div class="ctrl-panel" id="ctrlHints">
+    <!-- filled by JS based on device -->
+  </div>
+  <button id="enterBtn">⚡&nbsp; ENTER THE VOID</button>
+</div>
+
+<!-- HUD -->
+<div id="hud">
+  <div class="hname">TERMINATEVADER</div>
+  <div id="hudKeys"></div>
+</div>
+
+<div id="xhair"></div>
+<div id="tip"></div>
+
+<!-- Minimap -->
+<div id="minimap"><canvas id="mmCanvas" width="120" height="120"></canvas></div>
+
+<!-- Mobile virtual joystick -->
+<div id="joyWrap">
+  <div id="joyBase"><div id="joyKnob"></div></div>
+</div>
+<!-- Mobile look zone -->
+<div id="lookArea"></div>
+<!-- Mobile open-link button -->
+<button id="tapBtn">[ OPEN ]</button>
+
+<!-- Gamepad hint -->
+<div id="padHint"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+'use strict';
+/* ═══════════════════════════════════════════════════════════════
+   DATA
+═══════════════════════════════════════════════════════════════ */
+const LINKS = [
+  {name:'YouTube',     url:'https://www.youtube.com/terminatevader',                    c:0xff0000, cat:'Content',  lbl:'YT'},
+  {name:'TikTok',      url:'https://www.tiktok.com/@terminatevader',                    c:0x00e5ff, cat:'Content',  lbl:'TK'},
+  {name:'Instagram',   url:'https://www.instagram.com/terminatevader',                  c:0xff0088, cat:'Social',   lbl:'IG'},
+  {name:'X / Twitter', url:'https://x.com/terminatevader',                              c:0xeeeeee, cat:'Social',   lbl:'X'},
+  {name:'Discord',     url:'https://discord.gg/DVNUcqe',                                c:0x5865f2, cat:'Social',   lbl:'DC'},
+  {name:'Facebook',    url:'https://www.facebook.com/terminatevader',                   c:0x1877f2, cat:'Social',   lbl:'FB'},
+  {name:'Reddit',      url:'https://www.reddit.com/r/TermiNateVader',                   c:0xff4500, cat:'Social',   lbl:'RD'},
+  {name:'Bluesky',     url:'https://bsky.app/profile/terminatevader.com',               c:0x0099ff, cat:'Social',   lbl:'BS'},
+  {name:'Snapchat',    url:'https://www.snapchat.com/add/terminatevader',               c:0xffee00, cat:'Social',   lbl:'SC'},
+  {name:'Threads',     url:'https://www.threads.net/@terminatevader',                   c:0xdddddd, cat:'Social',   lbl:'TH'},
+  {name:'Lemon8',      url:'https://www.lemon8-app.com/@terminatevader',                c:0xffcc00, cat:'Social',   lbl:'L8'},
+  {name:'GitHub',      url:'https://github.com/terminatevader',                         c:0xaaaaaa, cat:'Dev',      lbl:'GH'},
+  {name:'Steam',       url:'https://steamcommunity.com/id/terminatevader/',             c:0x4a9ecf, cat:'Gaming',   lbl:'ST'},
+  {name:'PlayStation', url:'https://profile.playstation.com/TermiNateVader',            c:0x0070d1, cat:'Gaming',   lbl:'PS'},
+  {name:'Xbox',        url:'https://account.xbox.com/en-us/Profile?xr=mebarnav&rtc=1', c:0x107c10, cat:'Gaming',   lbl:'XB'},
+  {name:'Roblox',      url:'https://www.roblox.com/users/2212929342/profile',           c:0xff3333, cat:'Gaming',   lbl:'RX'},
+  {name:'Minecraft',   url:'https://realms.gg/Hh4_zrgshEkxurU',                        c:0x5aaa2a, cat:'Gaming',   lbl:'MC'},
+  {name:'Merch Store', url:'https://store.terminatevader.com/',                         c:0xffaa00, cat:'Merch',    lbl:'$$'},
+  {name:'Cash App',    url:'https://cash.app/$terminatevader',                          c:0x00d64f, cat:'Support',  lbl:'CA'},
+  {name:'Website',     url:'https://www.terminatevader.com/',                           c:0xff6622, cat:'Site',     lbl:'WEB'},
+];
+
+/* ═══════════════════════════════════════════════════════════════
+   DEVICE DETECTION
+═══════════════════════════════════════════════════════════════ */
+const UA = navigator.userAgent;
+const isTouch    = ('ontouchstart' in window) || navigator.maxTouchPoints > 0;
+const isMobile   = /Mobi|Android|iPhone|iPad|iPod/i.test(UA) || (isTouch && window.innerWidth < 1100);
+const isTV       = /SmartTV|SMART-TV|Tizen|WebOS|NetCast|DLNADOC|HbbTV|AppleTV|googletv|crkey/i.test(UA);
+const isPS       = /PlayStation|PSP|PS4|PS5/i.test(UA);
+const isXbox     = /Xbox/i.test(UA);
+const isConsole  = isPS || isXbox || isTV;
+const hasGamepad = 'getGamepads' in navigator;
+
+/* WebGL check */
+function hasWebGL(){
+  try{
+    const c=document.createElement('canvas');
+    return !!(c.getContext('webgl')||c.getContext('experimental-webgl'));
+  }catch(e){return false;}
+}
+
+/* ═══════════════════════════════════════════════════════════════
+   FALLBACK 2D PAGE
+═══════════════════════════════════════════════════════════════ */
+if(!hasWebGL()){
+  document.getElementById('fallback').style.display='block';
+  document.getElementById('overlay').style.display='none';
+  const g=document.getElementById('fGrid');
+  LINKS.forEach(l=>{
+    const a=document.createElement('a');
+    a.className='f-link';a.href=l.url;a.target='_blank';a.rel='noopener';
+    a.innerHTML=`<span>${l.name}</span><span class="fl-cat">${l.cat}</span>`;
+    g.appendChild(a);
+  });
+} else {
+  /* Build overlay hints based on device */
+  const ch=document.getElementById('ctrlHints');
+  const hk=document.getElementById('hudKeys');
+  if(isMobile&&!isConsole){
+    ch.innerHTML='<b>LEFT THUMB</b> Move &nbsp;|&nbsp; <b>RIGHT SWIPE</b> Look<br><b>TAP PORTAL</b> then <b>[ OPEN ]</b> to visit link';
+    hk.innerHTML='<div>Left thumb — Move</div><div>Right swipe — Look</div><div>Tap portal then [ OPEN ]</div>';
+  } else if(isConsole||isTV){
+    ch.innerHTML='<b>LEFT STICK</b> Move &nbsp;|&nbsp; <b>RIGHT STICK</b> Look<br><b>A / X / CROSS</b> Open Link &nbsp;|&nbsp; <b>D-PAD</b> Move';
+    hk.innerHTML='<div>Left Stick — Move</div><div>Right Stick — Look</div><div>A/Cross — Open Link</div>';
+    document.getElementById('padHint').innerHTML='<b>L-STICK</b> Move<br><b>R-STICK</b> Look<br><b>A/CROSS</b> Open';
+    document.getElementById('padHint').style.display='block';
+  } else {
+    ch.innerHTML='<b>WASD</b> / ARROWS Move &nbsp;|&nbsp; <b>MOUSE</b> Look<br><b>SHIFT</b> Sprint &nbsp;|&nbsp; <b>CLICK</b> Open Link &nbsp;|&nbsp; <b>ESC</b> Unlock';
+    hk.innerHTML='<div><b>WASD</b> Move</div><div><b>SHIFT</b> Sprint</div><div><b>CLICK</b> Open Link</div><div><b>ESC</b> Unlock</div>';
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     THREE.JS SCENE
+  ═══════════════════════════════════════════════════════════════ */
+  const scene    = new THREE.Scene();
+  scene.fog      = new THREE.FogExp2(0x000005,0.013);
+
+  const camera   = new THREE.PerspectiveCamera(75,innerWidth/innerHeight,0.1,900);
+  camera.position.set(0,1.8,0);
+
+  const renderer = new THREE.WebGLRenderer({antialias:!isMobile,powerPreference:'high-performance'});
+  renderer.setSize(innerWidth,innerHeight);
+  renderer.setPixelRatio(Math.min(devicePixelRatio,isMobile?1.5:2));
+  renderer.toneMapping=THREE.ACESFilmicToneMapping;
+  renderer.toneMappingExposure=0.88;
+  document.body.appendChild(renderer.domElement);
+
+  /* ── LIGHTS ─────────────────────────────────────────────────── */
+  scene.add(new THREE.AmbientLight(0x110015,0.55));
+  scene.add(new THREE.HemisphereLight(0x330011,0x000033,0.4));
+  const sun=new THREE.DirectionalLight(0xff1111,0.35);
+  sun.position.set(40,60,30); scene.add(sun);
+
+  /* ── STARS ──────────────────────────────────────────────────── */
+  (function(){
+    const n=isMobile?1800:4000;
+    const pos=new Float32Array(n*3);
+    for(let i=0;i<n*3;i++) pos[i]=(Math.random()-.5)*900;
+    const geo=new THREE.BufferGeometry();
+    geo.setAttribute('position',new THREE.BufferAttribute(pos,3));
+    scene.add(new THREE.Points(geo,new THREE.PointsMaterial({color:0xffffff,size:.45,sizeAttenuation:true})));
+    const pos2=new Float32Array((n/2)*3);
+    for(let i=0;i<pos2.length;i++) pos2[i]=(Math.random()-.5)*900;
+    const geo2=new THREE.BufferGeometry();
+    geo2.setAttribute('position',new THREE.BufferAttribute(pos2,3));
+    scene.add(new THREE.Points(geo2,new THREE.PointsMaterial({color:0xff3311,size:.35,sizeAttenuation:true})));
+  })();
+
+  /* ── GROUND ─────────────────────────────────────────────────── */
+  const ground=new THREE.Mesh(
+    new THREE.PlaneGeometry(400,400),
+    new THREE.MeshLambertMaterial({color:0x010007})
+  );
+  ground.rotation.x=-Math.PI/2;
+  scene.add(ground);
+  scene.add(new THREE.GridHelper(400,80,0x200009,0x0e0003));
+  const grid2=new THREE.GridHelper(200,200,0x110004,0x090002);
+  grid2.position.y=.02;
+  scene.add(grid2);
+
+  /* ── CENTRAL OBELISK ────────────────────────────────────────── */
+  const obelisk=new THREE.Mesh(
+    new THREE.CylinderGeometry(.35,.75,20,4),
+    new THREE.MeshLambertMaterial({color:0x160008})
+  );
+  obelisk.position.set(0,10,0);
+  obelisk.rotation.y=Math.PI/4;
+  scene.add(obelisk);
+
+  /* spinning gem at top */
+  const gemW=new THREE.Mesh(
+    new THREE.OctahedronGeometry(1.9,1),
+    new THREE.MeshBasicMaterial({color:0xff1100,wireframe:true})
+  );
+  gemW.position.set(0,21,0); scene.add(gemW);
+  const gemS=new THREE.Mesh(
+    new THREE.OctahedronGeometry(1.65,1),
+    new THREE.MeshBasicMaterial({color:0xff3300})
+  );
+  gemS.position.set(0,21,0); scene.add(gemS);
+
+  const coreL=new THREE.PointLight(0xff2200,7,90); coreL.position.set(0,21,0); scene.add(coreL);
+  const coreL2=new THREE.PointLight(0xff6600,3,45); coreL2.position.set(0,9,0); scene.add(coreL2);
+
+  /* obelisk decorative rings */
+  [4,9,14].forEach(y=>{
+    const r=new THREE.Mesh(
+      new THREE.TorusGeometry(1.25,.065,8,40),
+      new THREE.MeshBasicMaterial({color:0xff2200})
+    );
+    r.position.set(0,y,0); scene.add(r);
+  });
+
+  /* ── TITLE BILLBOARD ─────────────────────────────────────────── */
+  function makeTextTex(text,font,size,fillCol,glowCol,w,h){
+    const c=document.createElement('canvas'); c.width=w; c.height=h;
+    const x=c.getContext('2d');
+    x.clearRect(0,0,w,h);
+    x.font=`${size}px ${font}`;
+    x.textAlign='center'; x.textBaseline='middle';
+    x.shadowColor=glowCol||fillCol; x.shadowBlur=38;
+    x.fillStyle=fillCol;
+    x.fillText(text,w/2,h/2);
+    return new THREE.CanvasTexture(c);
+  }
+  const titleMesh=new THREE.Mesh(
+    new THREE.PlaneGeometry(18,4.5),
+    new THREE.MeshBasicMaterial({
+      map:makeTextTex('TERMINATEVADER','Orbitron,monospace',110,'#ff3300','#ff1100',1024,256),
+      transparent:true,side:THREE.DoubleSide,depthWrite:false
+    })
+  );
+  titleMesh.position.set(0,26,0);
+  scene.add(titleMesh);
+
+  /* ── PORTAL FACTORY ──────────────────────────────────────────── */
+  const PORTAL_RAD=36;
+  const portals=[]; // {face, ring, light, linkData, floatOff}
+  const clickTargets=[];
+
+  function hex3(c){return '#'+new THREE.Color(c).getHexString();}
+
+  function makePortalCanvas(link){
+    const W=256,H=320;
+    const c=document.createElement('canvas'); c.width=W; c.height=H;
+    const ctx=c.getContext('2d');
+    const col=hex3(link.c);
+
+    ctx.fillStyle='rgba(0,0,0,.65)'; ctx.fillRect(0,0,W,H);
+
+    /* top/bottom glow bars */
+    ['top','bottom'].forEach(pos=>{
+      const g=ctx.createLinearGradient(0,0,W,0);
+      g.addColorStop(0,'transparent'); g.addColorStop(.5,col); g.addColorStop(1,'transparent');
+      ctx.fillStyle=g;
+      ctx.fillRect(0,pos==='top'?0:H-5,W,5);
+    });
+    /* vertical side lines */
+    const gv=ctx.createLinearGradient(0,0,0,H);
+    gv.addColorStop(0,'transparent'); gv.addColorStop(.5,col+'88'); gv.addColorStop(1,'transparent');
+    ctx.fillStyle=gv;
+    ctx.fillRect(0,0,3,H); ctx.fillRect(W-3,0,3,H);
+
+    /* big label */
+    ctx.font=`bold 64px Share Tech Mono,monospace`;
+    ctx.fillStyle=col; ctx.textAlign='center'; ctx.textBaseline='middle';
+    ctx.shadowColor=col; ctx.shadowBlur=30;
+    ctx.fillText(link.lbl,W/2,108);
+
+    /* name */
+    ctx.font='21px Share Tech Mono,monospace'; ctx.shadowBlur=14;
+    ctx.fillText(link.name,W/2,182);
+
+    /* category */
+    ctx.font='13px Share Tech Mono,monospace'; ctx.shadowBlur=6;
+    ctx.fillStyle=col+'99';
+    ctx.fillText(`[ ${link.cat.toUpperCase()} ]`,W/2,232);
+
+    /* hint */
+    ctx.font='11px Share Tech Mono,monospace'; ctx.shadowBlur=0;
+    ctx.fillStyle='rgba(255,255,255,.18)';
+    ctx.fillText(isMobile?'TAP + [ OPEN ]':'CLICK TO VISIT',W/2,290);
+
+    return c;
+  }
+
+  LINKS.forEach((link,i)=>{
+    const angle=(i/LINKS.length)*Math.PI*2;
+    const px=Math.cos(angle)*PORTAL_RAD;
+    const pz=Math.sin(angle)*PORTAL_RAD;
+    const py=3.5;
+
+    /* platform disc */
+    const platM=new THREE.Mesh(
+      new THREE.CylinderGeometry(2.7,3.1,.35,8),
+      new THREE.MeshLambertMaterial({color:0x0d0005})
+    );
+    platM.position.set(px,.18,pz); scene.add(platM);
+
+    /* glow ring on disc */
+    const discR=new THREE.Mesh(
+      new THREE.TorusGeometry(2.7,.07,6,32),
+      new THREE.MeshBasicMaterial({color:link.c})
+    );
+    discR.rotation.x=Math.PI/2; discR.position.set(px,.38,pz); scene.add(discR);
+
+    /* pillar */
+    const pilH=py-.4;
+    const pilM=new THREE.Mesh(
+      new THREE.CylinderGeometry(.1,.1,pilH,6),
+      new THREE.MeshLambertMaterial({color:0x180007})
+    );
+    pilM.position.set(px,.4+pilH/2,pz); scene.add(pilM);
+
+    /* portal frame */
+    const frameM=new THREE.Mesh(
+      new THREE.BoxGeometry(3.3,4.3,.16),
+      new THREE.MeshLambertMaterial({color:new THREE.Color(link.c).multiplyScalar(.22)})
+    );
+    frameM.position.set(px,py,pz); frameM.lookAt(0,py,0); scene.add(frameM);
+
+    /* portal face */
+    const faceTex=new THREE.CanvasTexture(makePortalCanvas(link));
+    const faceMat=new THREE.MeshBasicMaterial({
+      map:faceTex,transparent:true,opacity:.96,
+      side:THREE.DoubleSide,depthWrite:false
+    });
+    const faceM=new THREE.Mesh(new THREE.PlaneGeometry(2.9,3.9),faceMat);
+    faceM.position.set(px,py,pz); faceM.lookAt(0,py,0);
+    const outDir=new THREE.Vector3(px,0,pz).normalize();
+    faceM.position.addScaledVector(outDir,-.09);
+    faceM.userData={link,faceMat,isPortal:true,floatBase:py,floatOff:i*.44};
+    scene.add(faceM);
+    clickTargets.push(faceM);
+
+    /* orbit ring */
+    const ring=new THREE.Mesh(
+      new THREE.TorusGeometry(2.05,.065,8,40),
+      new THREE.MeshBasicMaterial({color:link.c})
+    );
+    ring.position.set(px,py,pz); ring.lookAt(0,py,0);
+    ring.userData={floatBase:py,floatOff:i*.44};
+    scene.add(ring);
+
+    /* point light */
+    const pl=new THREE.PointLight(link.c,1.9,16);
+    pl.position.set(px,py,pz); scene.add(pl);
+
+    portals.push({face:faceM,ring,light:pl,link});
+  });
+
+  /* ── DECORATIVE PILLARS ──────────────────────────────────────── */
+  for(let i=0;i<8;i++){
+    const a=(i/8)*Math.PI*2; const R=17;
+    const h=4+Math.random()*5;
+    const m=new THREE.Mesh(
+      new THREE.CylinderGeometry(.14,.14,h,6),
+      new THREE.MeshLambertMaterial({color:0x1a0008})
+    );
+    m.position.set(Math.cos(a)*R,h/2,Math.sin(a)*R); scene.add(m);
+    const top=new THREE.Mesh(
+      new THREE.OctahedronGeometry(.28,0),
+      new THREE.MeshBasicMaterial({color:0xff2200})
+    );
+    top.position.set(Math.cos(a)*R,h+.28,Math.sin(a)*R); scene.add(top);
+    const tl=new THREE.PointLight(0xff2200,.9,9);
+    tl.position.set(Math.cos(a)*R,h+.28,Math.sin(a)*R); scene.add(tl);
+  }
+  /* outer sentinel pillars */
+  for(let i=0;i<20;i++){
+    const a=(i/20)*Math.PI*2; const R=60;
+    const h=2+Math.random()*3;
+    const m=new THREE.Mesh(
+      new THREE.CylinderGeometry(.18,.28,h,5),
+      new THREE.MeshLambertMaterial({color:0x0f0004})
+    );
+    m.position.set(Math.cos(a)*R,h/2,Math.sin(a)*R); scene.add(m);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     CONTROLS — UNIFIED STATE
+  ═══════════════════════════════════════════════════════════════ */
+  let isActive   = false; // true when scene is running
+  let yaw=0, pitch=0;
+  const keys={};
+  const tipEl=document.getElementById('tip');
+
+  /* ── RAYCASTING ─────────────────────────────────────────────── */
+  const raycaster=new THREE.Raycaster();
+  let hoveredPortal=null;
+  let closestPortal=null; // for mobile/console (by proximity)
+
+  function castFromCenter(){
+    raycaster.setFromCamera({x:0,y:0},camera);
+    const hits=raycaster.intersectObjects(clickTargets,false);
+    if(hits.length&&hits[0].object.userData.isPortal) return hits[0].object;
+    return null;
+  }
+
+  /* find closest portal for mobile/console open */
+  function findClosestPortal(){
+    let best=null,bestD=Infinity;
+    portals.forEach(p=>{
+      const d=camera.position.distanceTo(p.face.position);
+      if(d<bestD){bestD=d;best=p;}
+    });
+    return bestD<10?best:null;
+  }
+
+  function openLink(obj){
+    if(obj&&obj.userData&&obj.userData.link){
+      window.open(obj.userData.link.url,'_blank','noopener');
+    }
+  }
+
+  /* ── POINTER LOCK (desktop) ──────────────────────────────────── */
+  document.addEventListener('pointerlockchange',()=>{
+    const locked=document.pointerLockElement===renderer.domElement;
+    if(!locked&&isActive) showHint();
+  });
+
+  document.addEventListener('mousemove',e=>{
+    if(document.pointerLockElement!==renderer.domElement) return;
+    yaw  -=e.movementX*.0018;
+    pitch-=e.movementY*.0018;
+    pitch=Math.max(-1.28,Math.min(1.28,pitch));
+  });
+
+  document.addEventListener('click',()=>{
+    if(!isActive) return;
+    if(document.pointerLockElement!==renderer.domElement){
+      renderer.domElement.requestPointerLock&&renderer.domElement.requestPointerLock();
+      return;
+    }
+    const hit=castFromCenter();
+    if(hit) openLink(hit);
+  });
+
+  document.addEventListener('keydown',e=>{keys[e.code]=true;});
+  document.addEventListener('keyup',  e=>{keys[e.code]=false;});
+
+  /* ── MOBILE TOUCH JOYSTICK ───────────────────────────────────── */
+  const joyBase=document.getElementById('joyBase');
+  const joyKnob=document.getElementById('joyKnob');
+  const lookArea=document.getElementById('lookArea');
+  const tapBtn=document.getElementById('tapBtn');
+
+  let joyActive=false,joyId=-1,joyCenter={x:0,y:0};
+  let joyVec={x:0,y:0};
+  const JOY_R=34;
+
+  joyBase.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    const t=e.changedTouches[0];
+    const r=joyBase.getBoundingClientRect();
+    joyCenter={x:r.left+r.width/2,y:r.top+r.height/2};
+    joyId=t.identifier; joyActive=true;
+  },{passive:false});
+
+  document.addEventListener('touchmove',e=>{
+    e.preventDefault();
+    for(let t of e.changedTouches){
+      if(t.identifier===joyId){
+        let dx=t.clientX-joyCenter.x;
+        let dy=t.clientY-joyCenter.y;
+        const dist=Math.sqrt(dx*dx+dy*dy);
+        if(dist>JOY_R){dx=dx/dist*JOY_R;dy=dy/dist*JOY_R;}
+        joyVec={x:dx/JOY_R,y:dy/JOY_R};
+        joyKnob.style.transform=`translate(${dx}px,${dy}px)`;
+      }
+    }
+  },{passive:false});
+
+  document.addEventListener('touchend',e=>{
+    for(let t of e.changedTouches){
+      if(t.identifier===joyId){
+        joyId=-1;joyActive=false;
+        joyVec={x:0,y:0};
+        joyKnob.style.transform='';
+      }
+    }
+  });
+
+  /* look zone (right side swipe) */
+  let lookId=-1,lookLast={x:0,y:0};
+  const LOOK_SENS=.003;
+  lookArea.addEventListener('touchstart',e=>{
+    e.preventDefault();
+    if(lookId!==-1) return;
+    const t=e.changedTouches[0];
+    lookId=t.identifier;lookLast={x:t.clientX,y:t.clientY};
+  },{passive:false});
+  document.addEventListener('touchmove',e=>{
+    for(let t of e.changedTouches){
+      if(t.identifier===lookId){
+        yaw  -=(t.clientX-lookLast.x)*LOOK_SENS;
+        pitch-=(t.clientY-lookLast.y)*LOOK_SENS;
+        pitch=Math.max(-1.28,Math.min(1.28,pitch));
+        lookLast={x:t.clientX,y:t.clientY};
+      }
+    }
+  });
+  document.addEventListener('touchend',e=>{
+    for(let t of e.changedTouches){if(t.identifier===lookId) lookId=-1;}
+  });
+
+  /* tap-to-open button */
+  tapBtn.addEventListener('click',()=>{
+    const p=findClosestPortal();
+    if(p) openLink(p.face);
+  });
+  tapBtn.addEventListener('touchend',e=>{
+    e.preventDefault();
+    const p=findClosestPortal();
+    if(p) openLink(p.face);
+  });
+
+  /* ── GAMEPAD API ─────────────────────────────────────────────── */
+  let gpAPressed=false;
+  function readGamepad(){
+    if(!hasGamepad) return;
+    const pads=navigator.getGamepads();
+    if(!pads) return;
+    const gp=Array.from(pads).find(p=>p&&p.connected);
+    if(!gp) return;
+
+    /* Left stick -> move axes 0,1 */
+    const lx=gp.axes[0]||0, ly=gp.axes[1]||0;
+    /* Right stick -> look axes 2,3 */
+    const rx=gp.axes[2]||0, ry=gp.axes[3]||0;
+    const dead=.15;
+
+    /* inject into joyVec for movement */
+    joyVec.x=Math.abs(lx)>dead?lx:0;
+    joyVec.y=Math.abs(ly)>dead?ly:0;
+
+    /* look */
+    if(Math.abs(rx)>dead) yaw  -=rx*.04;
+    if(Math.abs(ry)>dead){ pitch-=ry*.04; pitch=Math.max(-1.28,Math.min(1.28,pitch)); }
+
+    /* D-Pad (buttons 12-15) */
+    if(gp.buttons[12]&&gp.buttons[12].pressed) joyVec.y=-1;
+    if(gp.buttons[13]&&gp.buttons[13].pressed) joyVec.y= 1;
+    if(gp.buttons[14]&&gp.buttons[14].pressed) joyVec.x=-1;
+    if(gp.buttons[15]&&gp.buttons[15].pressed) joyVec.x= 1;
+
+    /* A/Cross (btn 0) -> open link */
+    const aDown=gp.buttons[0]&&gp.buttons[0].pressed;
+    if(aDown&&!gpAPressed){
+      const hit=castFromCenter();
+      if(hit) openLink(hit);
+      else{ const p=findClosestPortal(); if(p) openLink(p.face); }
+    }
+    gpAPressed=aDown;
+  }
+
+  /* ── KEYBOARD TV (arrow keys already in keys{}) ─────────────── */
+
+  /* ═══════════════════════════════════════════════════════════════
+     SCENE ACTIVATE
+  ═══════════════════════════════════════════════════════════════ */
+  function showHint(){
+    /* do nothing special, overlay hidden, player free roam */
+  }
+
+  document.getElementById('enterBtn').addEventListener('click',()=>{
+    document.getElementById('overlay').style.display='none';
+    document.getElementById('hud').style.display='block';
+    document.getElementById('xhair').style.display=(!isMobile&&!isConsole)?'block':'none';
+    document.getElementById('minimap').style.display='block';
+    if(isMobile){
+      document.getElementById('joyWrap').style.display='block';
+      document.getElementById('lookArea').style.display='block';
+      document.getElementById('tapBtn').style.display='block';
+    }
+    isActive=true;
+    if(!isMobile&&!isConsole){
+      renderer.domElement.requestPointerLock&&renderer.domElement.requestPointerLock();
+    }
+  });
+
+  /* ═══════════════════════════════════════════════════════════════
+     MINIMAP
+  ═══════════════════════════════════════════════════════════════ */
+  const mmCtx=document.getElementById('mmCanvas').getContext('2d');
+  const MM=120, MMS=1.15; // pixels per world-unit ratio inverse
+  function drawMinimap(){
+    mmCtx.fillStyle='rgba(0,0,0,.85)'; mmCtx.fillRect(0,0,MM,MM);
+    const cx=MM/2,cy=MM/2;
+    portals.forEach((p,i)=>{
+      const angle=(i/LINKS.length)*Math.PI*2;
+      const wx=Math.cos(angle)*PORTAL_RAD;
+      const wz=Math.sin(angle)*PORTAL_RAD;
+      const mx=cx+wx/MMS, my=cy+wz/MMS;
+      mmCtx.fillStyle=hex3(p.link.c);
+      mmCtx.beginPath(); mmCtx.arc(mx,my,2,0,Math.PI*2); mmCtx.fill();
+    });
+    const ppx=cx+camera.position.x/MMS;
+    const ppy=cy+camera.position.z/MMS;
+    mmCtx.fillStyle='#ffffff';
+    mmCtx.beginPath(); mmCtx.arc(ppx,ppy,3,0,Math.PI*2); mmCtx.fill();
+    mmCtx.strokeStyle='#ff4422'; mmCtx.lineWidth=1.5;
+    mmCtx.beginPath();
+    mmCtx.moveTo(ppx,ppy);
+    mmCtx.lineTo(ppx-Math.sin(yaw)*9,ppy-Math.cos(yaw)*9);
+    mmCtx.stroke();
+    mmCtx.strokeStyle='#220008'; mmCtx.lineWidth=1;
+    mmCtx.strokeRect(0,0,MM,MM);
+  }
+
+  /* ═══════════════════════════════════════════════════════════════
+     ANIMATION LOOP
+  ═══════════════════════════════════════════════════════════════ */
+  const clock=new THREE.Clock();
+  const _forward=new THREE.Vector3();
+  const _right=new THREE.Vector3();
+  const _move=new THREE.Vector3();
+
+  function animate(){
+    requestAnimationFrame(animate);
+    const delta=Math.min(clock.getDelta(),.05);
+    const elapsed=clock.getElapsedTime();
+
+    readGamepad();
+
+    if(isActive){
+      /* movement */
+      const spd=(keys['ShiftLeft']||keys['ShiftRight'])?14:7;
+      let dx=joyVec.x, dz=joyVec.y; // joystick input
+      if(keys['KeyW']||keys['ArrowUp'])    dz-=1;
+      if(keys['KeyS']||keys['ArrowDown'])  dz+=1;
+      if(keys['KeyA']||keys['ArrowLeft'])  dx-=1;
+      if(keys['KeyD']||keys['ArrowRight']) dx+=1;
+
+      _forward.set(-Math.sin(yaw),0,-Math.cos(yaw));
+      _right.set(Math.cos(yaw),0,-Math.sin(yaw));
+      _move.set(0,0,0);
+      _move.addScaledVector(_forward,-dz*spd*delta);
+      _move.addScaledVector(_right,   dx*spd*delta);
+      camera.position.add(_move);
+      camera.position.y=1.8;
+      const B=90;
+      camera.position.x=Math.max(-B,Math.min(B,camera.position.x));
+      camera.position.z=Math.max(-B,Math.min(B,camera.position.z));
+
+      /* camera rotation */
+      camera.rotation.order='YXZ';
+      camera.rotation.y=yaw;
+      camera.rotation.x=pitch;
+
+      /* hover check (non-mobile) */
+      if(!isMobile){
+        const hit=castFromCenter();
+        if(hit!==hoveredPortal){
+          if(hoveredPortal) hoveredPortal.userData.faceMat.opacity=.96;
+          hoveredPortal=hit;
+        }
+        if(hit){
+          hit.userData.faceMat.opacity=1;
+          tipEl.style.opacity='1';
+          tipEl.textContent=`[ ${isConsole?'A/CROSS':'CLICK'} — ${hit.userData.link.name.toUpperCase()} ]`;
+        } else {
+          tipEl.style.opacity='0';
+        }
+      } else {
+        /* mobile: show tip + open btn if near portal */
+        const near=findClosestPortal();
+        if(near){
+          tipEl.style.opacity='1';
+          tipEl.textContent=`${near.link.name} — Tap [ OPEN ]`;
+          tapBtn.style.borderColor=hex3(near.link.c);
+          tapBtn.style.color=hex3(near.link.c);
+        } else {
+          tipEl.style.opacity='0';
+        }
+      }
+
+      drawMinimap();
+    }
+
+    /* title always faces camera */
+    titleMesh.rotation.y=Math.atan2(
+      camera.position.x-titleMesh.position.x,
+      camera.position.z-titleMesh.position.z
+    );
+
+    /* gem spin */
+    gemW.rotation.y+=.02; gemW.rotation.x+=.009;
+    gemS.rotation.y-=.013; gemS.rotation.x+=.007;
+
+    /* core pulse */
+    coreL.intensity=6+Math.sin(elapsed*1.8)*2.5;
+    coreL2.intensity=2.5+Math.sin(elapsed*2.4)*.9;
+
+    /* portal float */
+    portals.forEach((p,i)=>{
+      const off=p.face.userData.floatOff;
+      const fy=p.face.userData.floatBase+Math.sin(elapsed*.8+off)*.38;
+      p.face.position.y=fy;
+      p.ring.position.y=fy;
+      p.ring.rotation.z+=.009+i*.00015;
+      p.light.intensity=1.6+Math.sin(elapsed*2+i)*.55;
+    });
+
+    renderer.render(scene,camera);
+  }
+
+  animate();
+
+  /* resize */
+  window.addEventListener('resize',()=>{
+    camera.aspect=innerWidth/innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(innerWidth,innerHeight);
+  });
+
+} // end hasWebGL else
+</script>
+</body>
+</html>
