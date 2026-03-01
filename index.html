@@ -3,312 +3,206 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>TNV STARSHIP | Mine & Build</title>
+    <title>TNV</title>
+    <link href="https://fonts.googleapis.com/css2?family=Orbitron:wght@400;900&display=swap" rel="stylesheet">
     <style>
-        :root { --neon: #00f2ff; --warn: #ffcc00; --danger: #ff0044; }
-        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Courier New', monospace; color: white; user-select: none; }
+        :root { --trek: #00f2ff; --warn: #ffcc00; --deadly: #ff0044; }
+        body, html { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #000; font-family: 'Orbitron', sans-serif; color: white; touch-action: none; }
         #canvas-container { position: absolute; top: 0; left: 0; width: 100%; height: 100%; z-index: 1; }
         
-        /* HUD UI */
-        .hud { position: absolute; z-index: 10; pointer-events: none; text-transform: uppercase; }
-        #top-stats { top: 20px; left: 20px; display: flex; gap: 20px; background: rgba(0,0,0,0.7); padding: 10px; border: 1px solid var(--neon); }
-        .stat-val { color: var(--neon); font-weight: bold; }
+        /* Cinematic HUD */
+        .hud { position: absolute; z-index: 10; pointer-events: none; }
+        #cockpit-frame { position: absolute; inset: 0; border: 20px solid rgba(255,255,255,0.03); pointer-events: none; z-index: 5; box-shadow: inset 0 0 100px rgba(0,0,0,0.8); }
+        
+        #stats { top: 30px; left: 30px; border-left: 2px solid var(--trek); padding: 15px; background: rgba(0,0,0,0.4); backdrop-filter: blur(5px); }
+        .bar { width: 150px; height: 4px; background: #222; margin-top: 5px; }
+        #shield-fill { height: 100%; background: var(--trek); transition: width 0.3s; }
 
-        #inventory { bottom: 20px; left: 50%; transform: translateX(-50%); background: rgba(0,0,0,0.8); border: 2px solid #555; padding: 10px; display: flex; gap: 10px; }
-        .slot { width: 50px; height: 50px; border: 1px solid #444; display: flex; flex-direction: column; align-items: center; justify-content: center; font-size: 10px; }
-        .slot.active { border-color: var(--neon); box-shadow: 0 0 10px var(--neon); }
+        #comms { bottom: 30px; left: 30px; width: 300px; height: 100px; background: rgba(0,0,0,0.6); border: 1px solid rgba(255,255,255,0.1); padding: 10px; font-size: 10px; color: #aaa; overflow: hidden; }
+        .msg { margin-bottom: 4px; border-bottom: 1px solid rgba(255,255,255,0.05); padding-bottom: 2px; }
 
-        #build-menu { top: 20px; right: 20px; width: 180px; background: rgba(0,5,15,0.9); border: 1px solid var(--neon); padding: 10px; pointer-events: auto; }
-        .nav-btn { display: block; color: var(--neon); text-decoration: none; font-size: 11px; margin: 5px 0; padding: 5px; border-bottom: 1px solid rgba(0,242,255,0.2); cursor: pointer; }
-        .nav-btn:hover { background: var(--neon); color: black; }
-
-        /* Mobile Controls */
-        #mobile-ui { position: absolute; bottom: 30px; width: 100%; display: none; justify-content: space-between; padding: 0 30px; box-sizing: border-box; z-index: 20; pointer-events: none; }
-        .m-btn { width: 70px; height: 70px; background: rgba(0,242,255,0.1); border: 2px solid var(--neon); border-radius: 50%; color: var(--neon); display: flex; align-items: center; justify-content: center; font-weight: bold; pointer-events: auto; }
-        @media (pointer: coarse) { #mobile-ui { display: flex; } }
-
-        #crosshair { top: 50%; left: 50%; transform: translate(-50%, -50%); font-size: 24px; color: var(--neon); opacity: 0.5; }
+        /* Controls */
+        #joy-move { position: absolute; bottom: 40px; right: 40px; width: 100px; height: 100px; border: 2px solid var(--trek); border-radius: 50%; pointer-events: auto; }
+        #joy-stick { position: absolute; top: 50%; left: 50%; width: 40px; height: 40px; background: var(--trek); border-radius: 50%; transform: translate(-50%,-50%); opacity: 0.5; }
+        #btn-fire { position: absolute; bottom: 40px; left: 50%; transform: translateX(-50%); width: 80px; height: 80px; border: 2px solid var(--deadly); border-radius: 50%; pointer-events: auto; display: flex; align-items: center; justify-content: center; font-weight: 900; color: var(--deadly); background: rgba(255,0,68,0.1); }
     </style>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
-    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/renderers/CSS2DRenderer.js"></script>
 </head>
 <body>
 
     <div id="canvas-container"></div>
-    <div id="crosshair" class="hud">+</div>
+    <div id="cockpit-frame"></div>
 
-    <div id="top-stats" class="hud">
-        <div>HULL: <span id="hp" class="stat-val">100</span>%</div>
-        <div>MATTER: <span id="matter" class="stat-val">0</span></div>
-        <div>MODE: <span id="mode" class="stat-val">FLIGHT</span></div>
+    <div id="stats" class="hud">
+        <div style="font-size: 10px; opacity: 0.6;">SHIELDS</div>
+        <div class="bar"><div id="shield-fill" style="width: 100%;"></div></div>
+        <div style="margin-top: 15px; font-size: 18px;"><span id="matter-val">0</span> <small style="font-size: 9px;">MATTER</small></div>
     </div>
 
-    <div id="build-menu" class="hud">
-        <div style="font-weight: bold; border-bottom: 1px solid var(--neon);">COMMAND_CONSOLE</div>
-        <div class="nav-btn" onclick="toggleBuildMode()">TOGGLE BUILD [B]</div>
-        <div class="nav-btn" onclick="warpTo(0,0,0)">WARP TO SPAWN</div>
-        <div id="station-links"></div>
+    <div id="comms" class="hud">
+        <div class="msg" style="color:var(--trek)">[SYSTEM] Deep Space Sensors Active...</div>
     </div>
 
-    <div id="inventory" class="hud">
-        <div class="slot active" id="slot-1">LASER</div>
-        <div class="slot" id="slot-2">BUILD</div>
-    </div>
-
-    <div id="mobile-ui">
-        <div class="m-btn" id="m-action">FIRE</div>
-        <div class="m-btn" id="m-build">BUILD</div>
-    </div>
+    <div id="btn-fire" class="hud">FIRE</div>
+    <div id="joy-move" class="hud"><div id="joy-stick"></div></div>
 
     <script>
-        // --- DATA & STATE ---
-        const links = [
-            { n: "YouTube", u: "https://www.youtube.com/terminatevader" },
-            { n: "Discord", u: "https://discord.gg/DVNUcqe" },
-            { n: "Store", u: "https://store.terminatevader.com/" }
-        ];
-
-        let state = {
-            hp: 100,
-            matter: 0,
-            buildMode: false,
-            inventory: 1,
-            velocity: new THREE.Vector3(),
-            rotation: new THREE.Euler(0, 0, 0, 'YXZ')
+        // --- SHIP STATE & STORAGE ---
+        let ship = {
+            shields: 100,
+            matter: parseInt(localStorage.getItem('tnv_matter')) || 0,
+            pos: new THREE.Vector3(0, 0, 2000),
+            rot: new THREE.Euler(0, 0, 0, 'YXZ'),
+            input: { w:0, s:0, a:0, d:0, lookX:0, lookY:0 }
         };
 
-        // --- ENGINE SETUP ---
         const scene = new THREE.Scene();
-        scene.fog = new THREE.FogExp2(0x000000, 0.0006);
-        const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 10000);
+        const camera = new THREE.PerspectiveCamera(75, window.innerWidth/window.innerHeight, 1, 50000);
         const renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setPixelRatio(window.devicePixelRatio);
         renderer.setSize(window.innerWidth, window.innerHeight);
         document.getElementById('canvas-container').appendChild(renderer.domElement);
 
-        const labelRenderer = new THREE.CSS2DRenderer();
-        labelRenderer.setSize(window.innerWidth, window.innerHeight);
-        labelRenderer.domElement.style.position = 'absolute';
-        labelRenderer.domElement.style.top = '0';
-        labelRenderer.domElement.style.pointerEvents = 'none';
-        document.body.appendChild(labelRenderer.domElement);
-
-        const clock = new THREE.Clock();
+        // --- PROC-GEN ENTITIES ---
+        const factions = [];
         const loader = new THREE.TextureLoader();
+        const profileTex = loader.load('channels4_profile (3).jpg');
 
-        // --- WORLD GROUPS ---
-        const asteroids = [];
-        const lootItems = [];
-        const builtObjects = [];
-        const hazards = [];
-
-        // --- PROCEDURAL GENERATION ---
-        function initWorld() {
-            // Stars
-            const starGeo = new THREE.BufferGeometry();
-            const starPos = new Float32Array(10000 * 3);
-            for(let i=0; i<30000; i++) starPos[i] = (Math.random()-0.5)*8000;
-            starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
-            scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 1})));
-
-            // Asteroid Field
-            for(let i=0; i<300; i++) spawnAsteroid();
-
-            // Hazards
-            createHazard('BLACK HOLE', 0x000000, new THREE.Vector3(1500, 0, -1500), 100);
-            createHazard('SUPERNOVA', 0xffaa00, new THREE.Vector3(-1500, 500, -500), 200);
-
-            // TNV Stations
-            links.forEach((link, i) => {
-                const pos = new THREE.Vector3((i - 1) * 600, 0, -800);
-                createStation(link, pos);
-            });
-        }
-
-        function spawnAsteroid(pos) {
-            const geo = new THREE.DodecahedronGeometry(5 + Math.random()*10, 0);
-            const mat = new THREE.MeshStandardMaterial({color: 0x444444});
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.set(
-                pos ? pos.x : (Math.random()-0.5)*3000,
-                pos ? pos.y : (Math.random()-0.5)*1500,
-                pos ? pos.z : (Math.random()-0.5)*3000
-            );
-            scene.add(mesh);
-            asteroids.push(mesh);
-        }
-
-        function createHazard(name, color, pos, size) {
-            const mesh = new THREE.Mesh(new THREE.SphereGeometry(size, 32, 32), new THREE.MeshBasicMaterial({color: color, wireframe: true}));
-            mesh.position.copy(pos);
-            scene.add(mesh);
-            hazards.push({mesh, name, size});
-        }
-
-        function createStation(link, pos) {
-            const geo = new THREE.BoxGeometry(60, 60, 60);
-            const mat = new THREE.MeshStandardMaterial({color: 0x00f2ff, wireframe: true});
-            const mesh = new THREE.Mesh(geo, mat);
-            mesh.position.copy(pos);
-            
-            const div = document.createElement('a');
-            div.style.background = 'rgba(0,0,0,0.8)';
-            div.style.border = '1px solid #00f2ff';
-            div.style.color = '#00f2ff';
-            div.style.padding = '5px';
-            div.style.fontSize = '12px';
-            div.href = link.u;
-            div.target = "_blank";
-            div.textContent = `[DOCK: ${link.n}]`;
-            
-            const label = new THREE.CSS2DObject(div);
-            label.position.set(0, 50, 0);
-            mesh.add(label);
-            scene.add(mesh);
-
-            const btn = document.createElement('div');
-            btn.className = 'nav-btn';
-            btn.textContent = `> FLY TO ${link.n}`;
-            btn.onclick = () => warpTo(pos.x, pos.y, pos.z + 150);
-            document.getElementById('station-links').appendChild(btn);
-        }
-
-        // --- MINING & LOOT ---
-        function fire() {
-            if(state.buildMode) { buildObject(); return; }
-            
-            const raycaster = new THREE.Raycaster();
-            raycaster.setFromCamera(new THREE.Vector2(0,0), camera);
-            
-            const intersects = raycaster.intersectObjects(asteroids);
-            
-            // Visual Laser
-            const lGeo = new THREE.BufferGeometry().setFromPoints([new THREE.Vector3(0,-1,-2), new THREE.Vector3(0,0,-100)]);
-            const laserLine = new THREE.Line(lGeo, new THREE.LineBasicMaterial({color: 0x00f2ff}));
-            camera.add(laserLine);
-            setTimeout(() => camera.remove(laserLine), 50);
-
-            if(intersects.length > 0) {
-                const target = intersects[0].object;
-                spawnLoot(target.position);
-                scene.remove(target);
-                asteroids.splice(asteroids.indexOf(target), 1);
+        function spawnFaction(type, pos) {
+            const group = new THREE.Group();
+            let body;
+            if(type === 'BORG') {
+                body = new THREE.Mesh(new THREE.BoxGeometry(200, 200, 200), new THREE.MeshStandardMaterial({color: 0x0a0a0a, emissive: 0x00ff44, emissiveIntensity: 0.5, wireframe: true}));
+            } else {
+                body = new THREE.Mesh(new THREE.ConeGeometry(50, 150, 4), new THREE.MeshStandardMaterial({color: 0x222222, emissive: 0xff0000}));
+                body.rotation.x = Math.PI/2;
             }
+            group.add(body);
+            group.position.copy(pos);
+            group.userData = { type, hp: 100, lastAction: 0 };
+            scene.add(group);
+            factions.push(group);
         }
 
-        function spawnLoot(pos) {
-            const loot = new THREE.Mesh(new THREE.BoxGeometry(2,2,2), new THREE.MeshBasicMaterial({color: 0x00f2ff}));
-            loot.position.copy(pos);
-            scene.add(loot);
-            lootItems.push(loot);
-        }
+        // Initialize World
+        const sun = new THREE.Mesh(new THREE.SphereGeometry(500, 32, 32), new THREE.MeshStandardMaterial({emissive: 0xffaa00, map: profileTex}));
+        sun.position.set(0, 0, -8000);
+        scene.add(sun);
+        scene.add(new THREE.PointLight(0xffaa00, 3, 15000));
+        scene.add(new THREE.AmbientLight(0xffffff, 0.1));
 
-        // --- BUILDING ---
-        function toggleBuildMode() {
-            state.buildMode = !state.buildMode;
-            document.getElementById('mode').textContent = state.buildMode ? "BUILDING" : "FLIGHT";
-            document.getElementById('slot-1').className = state.buildMode ? "slot" : "slot active";
-            document.getElementById('slot-2').className = state.buildMode ? "slot active" : "slot";
-            document.getElementById('m-action').textContent = state.buildMode ? "PLACE" : "FIRE";
-        }
+        spawnFaction('BORG', new THREE.Vector3(-3000, 500, -4000));
+        spawnFaction('EMPIRE', new THREE.Vector3(3000, -500, -5000));
 
-        function buildObject() {
-            if(state.matter < 5) return;
-            state.matter -= 5;
-            updateHUD();
+        // Background Starfield
+        const starGeo = new THREE.BufferGeometry();
+        const starPos = new Float32Array(15000 * 3);
+        for(let i=0; i<45000; i++) starPos[i] = (Math.random()-0.5) * 30000;
+        starGeo.setAttribute('position', new THREE.BufferAttribute(starPos, 3));
+        scene.add(new THREE.Points(starGeo, new THREE.PointsMaterial({color: 0xffffff, size: 2})));
 
-            const block = new THREE.Mesh(new THREE.BoxGeometry(10,10,10), new THREE.MeshStandardMaterial({color: 0x00f2ff, wireframe: true}));
-            const spawnPos = new THREE.Vector3(0,0,-40);
-            spawnPos.applyQuaternion(camera.quaternion);
-            block.position.copy(camera.position).add(spawnPos);
-            scene.add(block);
-            builtObjects.push(block);
-        }
-
-        function warpTo(x,y,z) {
-            camera.position.set(x,y,z);
-            state.velocity.set(0,0,0);
-        }
-
-        // --- INPUTS ---
-        const keys = {};
-        window.onkeydown = (e) => {
-            keys[e.key.toLowerCase()] = true;
-            if(e.key === ' ') fire();
-            if(e.key.toLowerCase() === 'b') toggleBuildMode();
-        };
-        window.onkeyup = (e) => keys[e.key.toLowerCase()] = false;
-
-        document.getElementById('m-action').ontouchstart = (e) => { e.preventDefault(); fire(); };
-        document.getElementById('m-build').ontouchstart = (e) => { e.preventDefault(); toggleBuildMode(); };
-
+        // --- CONTROLS ---
+        // Mouse Lock
         document.body.onclick = () => { if(window.innerWidth > 1024) document.body.requestPointerLock(); };
-        window.onmousemove = (e) => {
+        document.addEventListener('mousemove', e => {
             if(document.pointerLockElement === document.body) {
-                state.rotation.y -= e.movementX * 0.002;
-                state.rotation.x -= e.movementY * 0.002;
+                ship.rot.y -= e.movementX * 0.002;
+                ship.rot.x -= e.movementY * 0.002;
             }
-        };
+        });
 
-        // --- MAIN LOOP ---
-        scene.add(new THREE.AmbientLight(0xffffff, 0.4));
-        const shipLight = new THREE.PointLight(0x00f2ff, 2, 500);
-        scene.add(shipLight);
+        // Joystick for Mobile
+        const joy = document.getElementById('joy-move');
+        const stick = document.getElementById('joy-stick');
+        let joyActive = false;
+        joy.addEventListener('touchstart', () => joyActive = true);
+        window.addEventListener('touchmove', e => {
+            if(!joyActive) return;
+            const t = e.touches[0];
+            const r = joy.getBoundingClientRect();
+            const x = (t.clientX - (r.left + 50)) / 50;
+            const y = (t.clientY - (r.top + 50)) / 50;
+            stick.style.transform = `translate(calc(-50% + ${x*25}px), calc(-50% + ${y*25}px))`;
+            ship.input.w = y < -0.2 ? -y : 0;
+            ship.input.s = y > 0.2 ? y : 0;
+            ship.rot.y -= x * 0.05;
+        });
+        window.addEventListener('touchend', () => { joyActive = false; stick.style.transform='translate(-50%,-50%)'; ship.input.w=0; ship.input.s=0; });
 
-        function updateHUD() {
-            document.getElementById('hp').textContent = Math.floor(state.hp);
-            document.getElementById('matter').textContent = state.matter;
+        // Phasers
+        function firePhasers() {
+            const ray = new THREE.Raycaster();
+            ray.setFromCamera(new THREE.Vector2(0,0), camera);
+            const hits = ray.intersectObjects(factions, true);
+            
+            // Visual Beam
+            const beam = new THREE.Mesh(new THREE.BoxGeometry(0.5, 0.5, 1000), new THREE.MeshBasicMaterial({color: 0x00f2ff}));
+            const dir = new THREE.Vector3(0,0,-1).applyQuaternion(camera.quaternion);
+            beam.position.copy(camera.position).add(dir.multiplyScalar(500));
+            beam.quaternion.copy(camera.quaternion);
+            scene.add(beam);
+            setTimeout(() => scene.remove(beam), 100);
+
+            if(hits.length > 0) {
+                const target = hits[0].object.parent || hits[0].object;
+                target.userData.hp -= 10;
+                addLog(`CRITICAL HIT on ${target.userData.type} entity`);
+                if(target.userData.hp <= 0) {
+                    addLog(`${target.userData.type} DESTROYED. +50 Matter`);
+                    ship.matter += 50;
+                    localStorage.setItem('tnv_matter', ship.matter);
+                    target.position.set(20000,0,0); // Remove from field
+                }
+            }
+        }
+        document.getElementById('btn-fire').addEventListener('touchstart', (e) => { e.preventDefault(); firePhasers(); });
+        window.onkeydown = (e) => { if(e.key === ' ') firePhasers(); if(e.key === 'w') ship.input.w = 1; if(e.key === 's') ship.input.s = 1; };
+        window.onkeyup = (e) => { if(e.key === 'w') ship.input.w = 0; if(e.key === 's') ship.input.s = 0; };
+
+        // --- SYSTEMS ---
+        function addLog(msg) {
+            const c = document.getElementById('comms');
+            c.innerHTML = `<div class="msg">${msg}</div>` + c.innerHTML;
         }
 
+        // --- ANIMATION LOOP ---
+        const clock = new THREE.Clock();
         function animate() {
             requestAnimationFrame(animate);
             const dt = clock.getDelta();
 
-            // Movement
-            const speed = keys['shift'] ? 300 : 100;
-            if(keys['w']) state.velocity.z = -speed; else if(keys['s']) state.velocity.z = speed; else state.velocity.z = 0;
-            if(keys['a']) state.velocity.x = -speed; else if(keys['d']) state.velocity.x = speed; else state.velocity.x = 0;
-            
-            camera.rotation.copy(state.rotation);
-            camera.translateX(state.velocity.x * dt);
-            camera.translateZ(state.velocity.z * dt);
-            shipLight.position.copy(camera.position);
+            // Ship movement
+            camera.rotation.copy(ship.rot);
+            const moveZ = (ship.input.s - ship.input.w) * 800 * dt;
+            camera.translateZ(moveZ);
 
-            // Loot collection
-            for(let i=lootItems.length-1; i>=0; i--) {
-                const item = lootItems[i];
-                item.rotation.y += 0.05;
-                if(camera.position.distanceTo(item.position) < 15) {
-                    scene.remove(item);
-                    lootItems.splice(i, 1);
-                    state.matter += 10;
-                    updateHUD();
-                }
-            }
-
-            // Hazards (Gravitational Pull)
-            hazards.forEach(h => {
-                const dist = camera.position.distanceTo(h.mesh.position);
-                if(dist < h.size * 5) {
-                    const pull = new THREE.Vector3().subVectors(h.mesh.position, camera.position).normalize();
-                    camera.position.add(pull.multiplyScalar((h.size / dist) * 2));
-                    if(dist < h.size) state.hp -= 0.5;
+            // AI Logic
+            factions.forEach(f => {
+                const dist = f.position.distanceTo(camera.position);
+                if(dist < 2500) {
+                    f.lookAt(camera.position);
+                    f.translateZ(150 * dt); // Chase player
+                    if(dist < 400 && Math.random() > 0.98) {
+                        ship.shields -= 1;
+                        addLog("<span style='color:red'>[ALERT] SHIELDS UNDER ATTACK</span>");
+                    }
+                } else {
+                    f.rotation.y += 0.2 * dt;
                 }
             });
 
-            if(state.hp <= 0) { state.hp = 100; warpTo(0,0,0); alert("SHIP REBORN AT SPAWN"); }
+            // UI Updates
+            document.getElementById('shield-fill').style.width = ship.shields + "%";
+            document.getElementById('matter-val').textContent = ship.matter;
+            if(ship.shields <= 0) { addLog("HULL BREACH. REBOOTING..."); setTimeout(()=>location.reload(), 2000); }
 
             renderer.render(scene, camera);
-            labelRenderer.render(scene, camera);
         }
-
-        initWorld();
         animate();
 
         window.onresize = () => {
-            camera.aspect = window.innerWidth / window.innerHeight;
-            camera.updateProjectionMatrix();
+            camera.aspect = window.innerWidth/window.innerHeight; camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
-            labelRenderer.setSize(window.innerWidth, window.innerHeight);
         };
     </script>
 </body>
